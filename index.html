@@ -3,223 +3,99 @@
   <head>
     <meta http-equiv="content-type" content="text/html; charset=utf-8"/>
     <title>Google Picker Example</title>
-    <style>
-      body {
-        display: flex
-      }
-      #views {
-        border-collapse: collapse;
-        margin: 10px;
-      }
-      #views tr {
-        border: 0;
-        border-top: 1px solid #e0e0e0;
-      }
-      #views td {
-        border-bottom:1px solid #e0e0e0;
-        border-spacing: 0;
-        padding: 5px
-      }
-    </style>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+<script async defer src="https://apis.google.com/js/api.js"
+        onload="this.onload=function(){};handleClientLoad()"
+        onreadystatechange="if (this.readyState === 'complete') this.onload()">
+</script>
 
-    <script type="text/javascript">
+<script>
+    var GoogleAuth;
+    var SCOPE = 'https://www.googleapis.com/auth/drive.photos.readonly';
 
-      // The Browser API key obtained from the Google Developers Console.
-      var developerKey = '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';
+    function handleClientLoad() {
+        // Load the API's client and auth2 modules.
+        // Call the initClient function after the modules load.
+        gapi.load('client:auth2', initClient);
+    }
 
-      // The Client ID obtained from the Google Developers Console. Replace with your own Client ID.
-      var clientId = "80092863867-ege4cgk100dcrkqu11n21nfm68em6om4.apps.googleusercontent.com";
+    function initClient() {
+        // Retrieve the discovery document for version 3 of Google Drive API.
+        // In practice, your app can retrieve one or more discovery documents.
+        var discoveryUrl = 'https://www.googleapis.com/discovery/v1/apis/photos/v1/rest';
 
-      // Scope to use to access user's photos.
-      var scope = [
-        'https://www.googleapis.com/auth/drive',
-        'https://www.googleapis.com/auth/photos',
-        'https://www.googleapis.com/auth/youtube'
-      ];
+        // Initialize the gapi.client object, which app uses to make API requests.
+        // Get API key and client ID from API Console.
+        // 'scope' field specifies space-delimited list of access scopes.
+        gapi.client.init({
+            'apiKey': 'XXXXXXXXXXXX',
+            'discoveryDocs': [discoveryUrl],
+            'clientId': 'XXXXXXXXXXXXXXXXXX',
+            'scope': SCOPE
+        }).then(function () {
+            GoogleAuth = gapi.auth2.getAuthInstance();
 
-      var authApiLoaded = false;
-      var pickerApiLoaded = false;
-      var oauthToken;
-      var viewIdForhandleAuthResult;
+            // Listen for sign-in state changes.
+            GoogleAuth.isSignedIn.listen(updateSigninStatus);
 
-      // Use the API Loader script to load google.picker and gapi.auth.
-      function onApiLoad() {
-        gapi.load('auth', {'callback': onAuthApiLoad});
-        gapi.load('picker', {'callback': onPickerApiLoad});
-      }
+            // Handle initial sign-in state. (Determine if user is already signed in.)
+            var user = GoogleAuth.currentUser.get();
+            setSigninStatus();
 
-      function onAuthApiLoad() {
-        authApiLoaded = true;
-      }
+            // Call handleAuthClick function when user clicks on
+            //      "Sign In/Authorize" button.
+            $('#sign-in-or-out-button').click(function () {
+                handleAuthClick();
+            });
+            $('#revoke-access-button').click(function () {
+                revokeAccess();
+            });
+        });
+    }
 
-      function onPickerApiLoad() {
-        pickerApiLoaded = true;
-      }
-
-      function handleAuthResult(authResult) {
-        if (authResult && !authResult.error) {
-          oauthToken = authResult.access_token;
-          createPicker(viewIdForhandleAuthResult, true);
+    function handleAuthClick() {
+        if (GoogleAuth.isSignedIn.get()) {
+            // User is authorized and has clicked 'Sign out' button.
+            GoogleAuth.signOut();
+        } else {
+            // User is not signed in. Start Google auth flow.
+            GoogleAuth.signIn();
         }
-      }
+    }
 
-      // Create and render a Picker object for picking user Photos.
-      function createPicker(viewId, setOAuthToken) {
-        if (authApiLoaded && pickerApiLoaded) {
-          var picker;
-          
-          if(authApiLoaded && oauthToken && setOAuthToken) {
-            picker = new google.picker.PickerBuilder().
-              addView(viewId).
-              setOAuthToken(oauthToken).
-              setDeveloperKey(developerKey).
-              setCallback(pickerCallback).
-              build();
-          } else {
-            picker = new google.picker.PickerBuilder().
-              addView(viewId).
-              setDeveloperKey(developerKey).
-              setCallback(pickerCallback).
-              build();
-          }
-          
-          picker.setVisible(true);
-        }
-      }
+    function revokeAccess() {
+        GoogleAuth.disconnect();
+    }
 
-      // A simple callback implementation.
-      function pickerCallback(data) {
-        var url = 'nothing';
-        if (data[google.picker.Response.ACTION] == google.picker.Action.PICKED) {
-          var doc = JSON.stringify(data[google.picker.Response.DOCUMENTS][0], null, "  ");
+    function setSigninStatus(isSignedIn) {
+        var user = GoogleAuth.currentUser.get();
+        var isAuthorized = user.hasGrantedScopes(SCOPE);
+        if (isAuthorized) {
+            $('#sign-in-or-out-button').html('Sign out');
+            $('#revoke-access-button').css('display', 'inline-block');
+            $('#auth-status').html('You are currently signed in and have granted ' +
+                'access to this app.');
+        } else {
+            $('#sign-in-or-out-button').html('Sign In/Authorize');
+            $('#revoke-access-button').css('display', 'none');
+            $('#auth-status').html('You have not authorized this app or you are ' +
+                'signed out.');
         }
-        var message = 'You picked: <br>' + doc;
-        document.getElementById('result').innerHTML = message;
-      }
-    </script>
+    }
+
+    function updateSigninStatus(isSignedIn) {
+        setSigninStatus();
+    }
+</script>
   </head>
   <body>
-    <a href="https://github.com/howdy39/google-picker-api-demo"><img style="position: absolute; top: 0; right: 0; border: 0;" src="https://camo.githubusercontent.com/38ef81f8aca64bb9a64448d0d70f1308ef5341ab/68747470733a2f2f73332e616d617a6f6e6177732e636f6d2f6769746875622f726962626f6e732f666f726b6d655f72696768745f6461726b626c75655f3132313632312e706e67" alt="Fork me on GitHub" data-canonical-src="https://s3.amazonaws.com/github/ribbons/forkme_right_darkblue_121621.png"></a>
-    <table id="views">
-      <tr>
-        <td rowspan="11">Google Drive</td>
-        <td><a href="#DOCS" id="DOCS">All Google Drive items.</a></td>
-      </tr>
-      <tr>
-        <td><a href="#DOCS_IMAGES" id="DOCS_IMAGES"</a>Google Drive photos.</a></td>
-      </tr>
-      <tr>
-        <td><a href="#DOCUMENTS" id="DOCUMENTS"</a>Google Drive Documents.</a></td>
-      </tr>
-      <tr>
-        <td><a href="#PRESENTATIONS" id="PRESENTATIONS"</a>Google Drive Presentations.</a></td>
-      </tr>
-      <tr>
-        <td><a href="#SPREADSHEETS" id="SPREADSHEETS"</a>Google Drive Spreadsheet.</a></td>
-      </tr>
-      <tr>
-        <td><a href="#FORMS" id="FORMS"</a>Google Drive Forms.</a></td>
-      </tr>
-      <tr>
-        <td><a href="#DOCS_IMAGES_AND_VIDEOS" id="DOCS_IMAGES_AND_VIDEOS"</a>Google Drive photos and videos.</a></td>
-      </tr>
-      <tr>
-        <td><a href="#DOCS_VIDEOS" id="DOCS_VIDEOS"</a>Google Drive videos.</a></td>
-      </tr>
-      <tr>
-        <td><a href="#FOLDERS" id="FOLDERS"</a>Google Drive Folders.</a></td>
-      </tr>
-      <tr>
-        <td><a href="#PDFS" id="PDFS"</a>Adobe PDF files stored in Google Drive.</a></td>
-      </tr>
-      <tr>
-        <td><a href="#DOCS_UPLOAD" id="DOCS_UPLOAD"</a>Upload documents to Google Drive.</a></td>
-      </tr>
-      <tr>
-        <td rowspan="3">Picasa(Google Photos)</td>
-        <td><a href="#PHOTO_ALBUMS" id="PHOTO_ALBUMS"</a>Picasa Web Albums photo albums.</a></td>
-      </tr>
-      <tr>
-        <td><a href="#PHOTOS" id="PHOTOS">Picasa Web Albums photos.</a></td>
-      <tr>
-        <td><a href="#PHOTO_UPLOAD" id="PHOTO_UPLOAD"</a>Upload to Picasa Web Albums.</a></td>
-      </tr>
-      <tr>
-        <td rowspan="3">Other(require authorization)</td>
-        <td><a href="#WEBCAM" id="WEBCAM"</a>Webcam photos.</a></td>
-      </tr>
-      <tr>
-        <td><a href="#YOUTUBE" id="YOUTUBE"</a>Your YouTube videos.</a></td>
-      </tr>
-      <tr>
-        <td><a href="#RECENTLY_PICKED" id="RECENTLY_PICKED"</a>A collection of most recently selected items.</a></td>
-      </tr>
-      <tr>
-        <td rowspan="3">Other(not require authorization)</td>
-        <td><a href="#IMAGE_SEARCH" id="IMAGE_SEARCH"</a>Google Image Search.</a></td>
-      </tr>
-      <tr>
-        <td><a href="#MAPS" id="MAPS"</a>Google Maps.</a></td>
-      </tr>
-      <tr>
-        <td><a href="#VIDEO_SEARCH" id="VIDEO_SEARCH"</a>Video Search.</a></td>
-      </tr>
-    </table>
-    
-    <pre id="result"></pre>
+   <button id="sign-in-or-out-button"
+        style="margin-left: 25px">Sign In/Authorize
+</button>
+<button id="revoke-access-button"
+        style="display: none; margin-left: 25px">Revoke access
+</button>
 
-    <!-- The Google API Loader script. -->
-    <script type="text/javascript" src="https://apis.google.com/js/api.js?onload=onApiLoad"></script>
-    <script type="text/javascript">
-      Array.prototype.forEach.call(document.querySelectorAll('#views a'), function (ele) {
-        ele.onclick = function () {
-          var viewIds = {
-            "DOCS":   google.picker.ViewId.DOCS,
-            "DOCS_IMAGES": google.picker.ViewId.DOCS_IMAGES,
-            "DOCUMENTS": google.picker.ViewId.DOCUMENTS,
-            "PRESENTATIONS": google.picker.ViewId.PRESENTATIONS,
-            "SPREADSHEETS": google.picker.ViewId.SPREADSHEETS,
-            "FORMS": google.picker.ViewId.FORMS,
-            "DOCS_IMAGES_AND_VIDEOS": google.picker.ViewId.DOCS_IMAGES_AND_VIDEOS,
-            "DOCS_VIDEOS": google.picker.ViewId.DOCS_VIDEOS,
-            "FOLDERS": google.picker.ViewId.FOLDERS,
-            "PDFS": google.picker.ViewId.PDFS,
-            "DOCS_UPLOAD": new google.picker.DocsUploadView(),
-            "PHOTO_ALBUMS": google.picker.ViewId.PHOTO_ALBUMS,
-            "PHOTOS": google.picker.ViewId.PHOTOS,
-            "PHOTO_UPLOAD": google.picker.ViewId.PHOTO_UPLOAD,
-            "IMAGE_SEARCH": google.picker.ViewId.IMAGE_SEARCH,
-            "MAPS": google.picker.ViewId.MAPS,
-            "VIDEO_SEARCH": google.picker.ViewId.VIDEO_SEARCH,
-            "WEBCAM": google.picker.ViewId.WEBCAM,
-            "YOUTUBE": google.picker.ViewId.YOUTUBE,
-            "RECENTLY_PICKED": google.picker.ViewId.RECENTLY_PICKED
-          }
-          var id = this.id;
-          var viewId = viewIds[id];
-          var setOAuthToken = true;
-          
-          if (id === 'IMAGE_SEARCH' || id === 'MAPS' || id === 'VIDEO_SEARCH') {
-            setOAuthToken = false;
-            createPicker(viewId, setOAuthToken);
-          } else {
-            if(authApiLoaded && !oauthToken) {
-              viewIdForhandleAuthResult = viewId;
-              window.gapi.auth.authorize(
-                {
-                  'client_id': clientId,
-                  'scope': scope,
-                  'immediate': false
-                },
-                handleAuthResult
-              );
-            } else {
-              createPicker(viewId, setOAuthToken);
-            }
-          }
-          return false;
-        }
-      });
-    </script>
+<div id="auth-status" style="display: inline; padding-left: 25px"></div>
   </body>
 </html>
